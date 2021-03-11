@@ -1,0 +1,29 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2019
+
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Frequency Panner - VST3", "Frequency Panner_VST3.vcxproj", "{31FE3339-D816-03C0-3A85-2E20FE91E2E0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{BA536555-7F2F-D268-062D-8D43A36F0FFA} = {BA536555-7F2F-D268-062D-8D43A36F0FFA}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Frequency Panner - Shared Code", "Frequency Panner_SharedCode.vcxproj", "{BA536555-7F2F-D268-062D-8D43A36F0FFA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{31FE3339-D816-03C0-3A85-2E20FE91E2E0}.Debug|x64.ActiveCfg = Debug|x64
+		{31FE3339-D816-03C0-3A85-2E20FE91E2E0}.Debug|x64.Build.0 = Debug|x64
+		{31FE3339-D816-03C0-3A85-2E20FE91E2E0}.Release|x64.ActiveCfg = Release|x64
+		{31FE3339-D816-03C0-3A85-2E20FE91E2E0}.Release|x64.Build.0 = Release|x64
+		{BA536555-7F2F-D268-062D-8D43A36F0FFA}.Debug|x64.ActiveCfg = Debug|x64
+		{BA536555-7F2F-D268-062D-8D43A36F0FFA}.Debug|x64.Build.0 = Debug|x64
+		{BA536555-7F2F-D268-062D-8D43A36F0FFA}.Release|x64.ActiveCfg = Release|x64
+		{BA536555-7F2F-D268-062D-8D43A36F0FFA}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

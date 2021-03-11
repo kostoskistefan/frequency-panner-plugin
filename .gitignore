@@ -1,0 +1,6 @@
+*
+.vs/
+!*/
+Debug/
+Release/*
+!Builds/VisualStudio2019/x64/Release/VST3/Frequency\ Panner.vst3

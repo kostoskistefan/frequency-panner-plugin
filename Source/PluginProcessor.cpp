@@ -10,12 +10,11 @@
 #include "PluginEditor.h"
 
 #define WIND 10
-#define CYCLE 400
 
 //==============================================================================
-FrequencyPannerAudioProcessor::FrequencyPannerAudioProcessor(): inputData(), weights(normalDistribution()), pitch(0)
+FrequencyPannerAudioProcessor::FrequencyPannerAudioProcessor():
 #ifndef JucePlugin_PreferredChannelConfigurations
-     , AudioProcessor (BusesProperties().withInput("Input", AudioChannelSet::mono(), true).withOutput("Output", AudioChannelSet::stereo(), true))
+     AudioProcessor (BusesProperties().withInput("Input", AudioChannelSet::mono(), true).withOutput("Output", AudioChannelSet::stereo(), true))
 #endif
 {}
 
@@ -90,12 +89,18 @@ void FrequencyPannerAudioProcessor::prepareToPlay (double sampleRate, int sample
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    initializeWeights();
+    pitch = 1000.0f;
+    pitchOffset = 0.0f;
+    upperFrequencyThreshold = 1200.0f;
+    lowerFrequencyThreshold = 80.0f;
 }
 
 void FrequencyPannerAudioProcessor::releaseResources()
 {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
+    weights.clear();
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -124,11 +129,10 @@ bool FrequencyPannerAudioProcessor::isBusesLayoutSupported (const BusesLayout& l
 }
 #endif
 
-std::vector<float> FrequencyPannerAudioProcessor::normalDistribution()
+void FrequencyPannerAudioProcessor::initializeWeights()
 {
     using namespace std;
 
-    vector<float> weights;
     vector<float> rev;
     float sum = 0;
 
@@ -150,20 +154,18 @@ std::vector<float> FrequencyPannerAudioProcessor::normalDistribution()
 
     for (float& weight : weights)
         weight /= sum;
-
-    return weights;
 }
 
-std::vector<float> FrequencyPannerAudioProcessor::convolute(std::vector<float> in)
+std::vector<float> FrequencyPannerAudioProcessor::convolve(std::vector<float> channelData)
 {
     std::vector<float> output;
 
-    for (int i = 0; i <= in.size() - weights.size(); i++)
+    for (int i = 0; i <= channelData.size() - weights.size(); i++)
     {
         float sum = 0;
 
         for (int j = 0; j < weights.size(); j++)
-            sum += in[i + j] * weights[j];
+            sum += channelData[i + j] * weights[j];
 
         output.push_back(sum);
     }
@@ -171,29 +173,19 @@ std::vector<float> FrequencyPannerAudioProcessor::convolute(std::vector<float> i
     return output;
 }
 
-void FrequencyPannerAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
+float FrequencyPannerAudioProcessor::detectPitch(float* channelData, int bufferSize)
 {
-    ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
-
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
-    auto* channelData = buffer.getReadPointer(0);
-    auto* outputL = buffer.getWritePointer(0);
-    auto* outputR = buffer.getWritePointer(1);
-
     std::vector<float> samples;
 
-    for (int i = 0; i < buffer.getNumSamples(); i++)
+    for (int i = 0; i < bufferSize; i++)
         samples.push_back(channelData[i]);
 
-    std::vector<float> smoothData = convolute(samples);
+    std::vector<float> smoothData = convolve(samples);
     std::vector<float> smoothPitches(1, 0);
     std::vector<float> dips;
 
-    for (int i = 1; i < CYCLE; i++)
+    // Smooth pitch
+    for (int i = 1; i < bufferSize / 2; i++)
     {
         float sum = 0;
 
@@ -203,7 +195,8 @@ void FrequencyPannerAudioProcessor::processBlock (AudioBuffer<float>& buffer, Mi
         smoothPitches.push_back(sum / (smoothData.size() - i));
     }
 
-    for (int i = WIND; i < CYCLE - WIND; i++)
+    // Dips data
+    for (int i = WIND; i < bufferSize / 2 - WIND; i++)
     {
         float min = smoothPitches[i - WIND];
 
@@ -217,6 +210,7 @@ void FrequencyPannerAudioProcessor::processBlock (AudioBuffer<float>& buffer, Mi
             dips.push_back(i);
     }
 
+    // Pitch calculation
     if (dips.size() > 1)
     {
         int size = dips.size() - 1;
@@ -226,16 +220,36 @@ void FrequencyPannerAudioProcessor::processBlock (AudioBuffer<float>& buffer, Mi
             sum += dips[i + 1] - dips[i];
 
         float avDip = sum / size;
-        float cheqFreq = 44100 / avDip;
-        pitch = pitch * 0.5 + cheqFreq * 0.5;
+        float cheqFreq = getSampleRate() / avDip;
+
+        if(cheqFreq < upperFrequencyThreshold)
+            pitch = (pitch + pitchOffset) * 0.5 + cheqFreq * 0.5;
     }
 
-    float pan = pitch / 2000.0f;
+    float panAmount = jmap(pitch, lowerFrequencyThreshold, upperFrequencyThreshold, 0.0f, 1.0f);
 
-    for (int i = 0; i < buffer.getNumSamples(); i++)
+    return panAmount;
+}
+
+void FrequencyPannerAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
+{
+    ScopedNoDenormals noDenormals;
+    auto totalNumInputChannels  = getTotalNumInputChannels();
+    auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    float* channelDataL = buffer.getWritePointer(0);
+    float* channelDataR = buffer.getWritePointer(1);
+    int numSamples = buffer.getNumSamples();
+
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        buffer.clear (i, 0, numSamples);
+
+    float pan = detectPitch(channelDataL, numSamples);
+
+    for (int i = 0; i < numSamples; i++)
     {
-        outputL[i] *= pan;
-        outputR[i] *= (1 - pan);
+        channelDataL[i] *= (1 - pan);
+        channelDataR[i] *= pan;
     }
 }
 

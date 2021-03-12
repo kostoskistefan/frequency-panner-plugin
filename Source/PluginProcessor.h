@@ -53,13 +53,17 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    std::vector<float> normalDistribution();
-    std::vector<float> convolute(std::vector<float> in);
+    void initializeWeights();
+    std::vector<float> convolve(std::vector<float> channelData);
+    float detectPitch(float * channelData, int bufferSize);
 
 private:
     //==============================================================================
-    std::vector<float> inputData;
     std::vector<float> weights;
-    int pitch;
+    float pitch;
+    float pitchOffset;
+    float upperFrequencyThreshold;
+    float lowerFrequencyThreshold;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FrequencyPannerAudioProcessor)
 };
